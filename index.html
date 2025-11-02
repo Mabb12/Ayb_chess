@@ -1,9 +1,11 @@
+# Написано нейросетью, потому-что я не знаю в js
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Микро-Шахматы 4x4</title>
+    <title>Айбийские микро-шахматы 4x4</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -449,60 +451,86 @@
                 }
                 return moves;
             }
-
-            // Метод для клонирования игры (нужен боту)
-            clone() {
-                const cloned = new MicroChess();
-                cloned.board = this.board.map(row => [...row]);
-                cloned.currentPlayer = this.currentPlayer;
-                cloned.gameOver = this.gameOver;
-                cloned.winner = this.winner;
-                return cloned;
-            }
         }
 
-        class SmartBot {
-            constructor(difficulty = 'medium') {
+        class Bot {
+            constructor(difficulty = 'easy') {
                 this.difficulty = difficulty;
-                this.depths = {
-                    'easy': 1,
-                    'medium': 2,
-                    'hard': 3
-                };
             }
             
             getMove(game) {
                 const moves = game.getAllLegalMoves();
                 if (moves.length === 0) return null;
                 
-                const depth = this.depths[this.difficulty] || 2;
-                
-                // Для легкого уровня иногда делаем случайные ходы
-                if (this.difficulty === 'easy' && Math.random() < 0.3) {
-                    return moves[Math.floor(Math.random() * moves.length)];
+                switch (this.difficulty) {
+                    case 'easy':
+                        return this.getEasyMove(moves);
+                    case 'medium':
+                        return this.getMediumMove(moves, game);
+                    case 'hard':
+                        return this.getHardMove(moves, game);
+                    default:
+                        return this.getEasyMove(moves);
                 }
+            }
+            
+            getEasyMove(moves) {
+                // Случайный ход
+                return moves[Math.floor(Math.random() * moves.length)];
+            }
+            
+            getMediumMove(moves, game) {
+                // Предпочитает взятия и движение к победе
+                const scoredMoves = moves.map(move => {
+                    let score = 0;
+                    
+                    // Взятие получает высокий приоритет
+                    if (move.type === 'capture') {
+                        score += 10;
+                    }
+                    
+                    // Движение к победе
+                    if (game.currentPlayer === 'white' && move.toRow === 3) {
+                        score += 20;
+                    } else if (game.currentPlayer === 'black' && move.toRow === 0) {
+                        score += 20;
+                    }
+                    
+                    // Предпочтение центральным колонкам
+                    if (move.toCol === 1 || move.toCol === 2) {
+                        score += 1;
+                    }
+                    
+                    return { score, move };
+                });
                 
-                let bestScore = game.currentPlayer === 'white' ? -Infinity : Infinity;
+                scoredMoves.sort((a, b) => b.score - a.score);
+                const bestScore = scoredMoves[0].score;
+                const bestMoves = scoredMoves.filter(item => item.score === bestScore);
+                return bestMoves[Math.floor(Math.random() * bestMoves.length)].move;
+            }
+            
+            getHardMove(moves, game) {
+                // Минимакс с небольшой глубиной
+                let bestScore = -Infinity;
                 let bestMoves = [];
                 
                 for (const move of moves) {
-                    // Создаем глубокую копию игры
-                    const testGame = game.clone();
+                    // Создаем копию игры для симуляции
+                    const testGame = {
+                        board: game.board.map(row => [...row]),
+                        currentPlayer: game.currentPlayer
+                    };
                     
                     // Делаем ход
-                    testGame.makeMove(move.fromRow, move.fromCol, move.toRow, move.toCol);
+                    testGame.board[move.toRow][move.toCol] = testGame.board[move.fromRow][move.fromCol];
+                    testGame.board[move.fromRow][move.fromCol] = null;
+                    testGame.currentPlayer = testGame.currentPlayer === 'white' ? 'black' : 'white';
                     
                     // Оцениваем позицию
-                    let score;
-                    if (depth > 1) {
-                        score = this.minimax(testGame, depth - 1, -Infinity, Infinity, testGame.currentPlayer === 'white');
-                    } else {
-                        score = this.evaluatePosition(testGame);
-                    }
+                    const score = this.evaluatePosition(testGame);
                     
-                    // Для белых ищем максимальный счет, для черных - минимальный
-                    if ((game.currentPlayer === 'white' && score > bestScore) ||
-                        (game.currentPlayer === 'black' && score < bestScore)) {
+                    if (score > bestScore) {
                         bestScore = score;
                         bestMoves = [move];
                     } else if (score === bestScore) {
@@ -510,147 +538,30 @@
                     }
                 }
                 
-                return bestMoves.length > 0 ? bestMoves[Math.floor(Math.random() * bestMoves.length)] : moves[0];
-            }
-            
-            minimax(game, depth, alpha, beta, maximizingPlayer) {
-                if (depth === 0 || game.gameOver) {
-                    return this.evaluatePosition(game);
-                }
-                
-                const moves = game.getAllLegalMoves();
-                
-                if (maximizingPlayer) {
-                    let maxEval = -Infinity;
-                    for (const move of moves) {
-                        const testGame = game.clone();
-                        testGame.makeMove(move.fromRow, move.fromCol, move.toRow, move.toCol);
-                        const eval = this.minimax(testGame, depth - 1, alpha, beta, false);
-                        maxEval = Math.max(maxEval, eval);
-                        alpha = Math.max(alpha, eval);
-                        if (beta <= alpha) break;
-                    }
-                    return maxEval;
-                } else {
-                    let minEval = Infinity;
-                    for (const move of moves) {
-                        const testGame = game.clone();
-                        testGame.makeMove(move.fromRow, move.fromCol, move.toRow, move.toCol);
-                        const eval = this.minimax(testGame, depth - 1, alpha, beta, true);
-                        minEval = Math.min(minEval, eval);
-                        beta = Math.min(beta, eval);
-                        if (beta <= alpha) break;
-                    }
-                    return minEval;
-                }
+                return bestMoves[Math.floor(Math.random() * bestMoves.length)];
             }
             
             evaluatePosition(game) {
-                if (game.gameOver) {
-                    if (game.winner === 'white') return 1000;
-                    if (game.winner === 'black') return -1000;
-                    return 0;
-                }
-                
                 let score = 0;
                 
-                // Оценка материала и позиции
                 for (let row = 0; row < 4; row++) {
                     for (let col = 0; col < 4; col++) {
                         const piece = game.board[row][col];
-                        if (piece === 'white') {
-                            score += 100;
-                            // Позиционная оценка для белых
-                            score += (3 - row) * 15; // Близость к победе
-                            score += this.getControlBonus(row, col, 'white');
-                            score += this.getSafetyBonus(game, row, col, 'white');
-                        } else if (piece === 'black') {
-                            score -= 100;
-                            // Позиционная оценка для черных
-                            score -= row * 15; // Близость к победе
-                            score -= this.getControlBonus(row, col, 'black');
-                            score -= this.getSafetyBonus(game, row, col, 'black');
+                        if (piece === game.currentPlayer) {
+                            score += 1;
+                            // Близость к победе
+                            if (game.currentPlayer === 'white') {
+                                score += (3 - row) * 2;
+                            } else {
+                                score += row * 2;
+                            }
+                        } else if (piece !== null) {
+                            score -= 1;
                         }
                     }
                 }
-                
-                // Мобильность
-                const whiteMoves = game.currentPlayer === 'white' ? game.getAllLegalMoves().length : 0;
-                const blackMoves = game.currentPlayer === 'black' ? game.getAllLegalMoves().length : 0;
-                score += (whiteMoves - blackMoves) * 2;
                 
                 return score;
-            }
-            
-            getControlBonus(row, col, player) {
-                let bonus = 0;
-                // Центральные поля более ценны
-                if (col === 1 || col === 2) bonus += 3;
-                if (row === 1 || row === 2) bonus += 2;
-                
-                // Контроль ключевых полей
-                if (player === 'white') {
-                    if (row === 2) bonus += 5; // Предпоследняя линия
-                } else {
-                    if (row === 1) bonus += 5; // Предпоследняя линия для черных
-                }
-                
-                return bonus;
-            }
-            
-            getSafetyBonus(game, row, col, player) {
-                let bonus = 0;
-                const opponent = player === 'white' ? 'black' : 'white';
-                
-                // Защищенность пешки
-                if (this.isProtected(game, row, col, player)) {
-                    bonus += 8;
-                }
-                
-                // Угрозы взятия
-                if (this.isUnderAttack(game, row, col, opponent)) {
-                    bonus -= 10;
-                }
-                
-                return bonus;
-            }
-            
-            isProtected(game, row, col, player) {
-                // Проверяем, защищена ли пешка другой пешкой
-                const directions = player === 'white' 
-                    ? [[-1, -1], [-1, 1]]  // Белые защищаются сзади-по-диагонали
-                    : [[1, -1], [1, 1]];   // Черные защищаются сзади-по-диагонали
-                    
-                for (const [dr, dc] of directions) {
-                    const newRow = row + dr;
-                    const newCol = col + dc;
-                    if (newRow >= 0 && newRow < 4 && newCol >= 0 && newCol < 4) {
-                        if (game.board[newRow][newCol] === player) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-            
-            isUnderAttack(game, row, col, opponent) {
-                // Проверяем, атакована ли пешка
-                for (let r = 0; r < 4; r++) {
-                    for (let c = 0; c < 4; c++) {
-                        if (game.board[r][c] === opponent) {
-                            const captureDirections = opponent === 'black' 
-                                ? [[-1, -1], [-1, 1], [0, -1], [0, 1]]
-                                : [[1, -1], [1, 1], [0, -1], [0, 1]];
-                            
-                            for (const [dr, dc] of captureDirections) {
-                                if (r + dr === row && c + dc === col) {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-                return false;
             }
         }
 
@@ -872,17 +783,17 @@
                 
                 switch (this.gameMode) {
                     case 'pve_easy':
-                        this.botBlack = new SmartBot('easy');
+                        this.botBlack = new Bot('easy');
                         break;
                     case 'pve_medium':
-                        this.botBlack = new SmartBot('medium');
+                        this.botBlack = new Bot('medium');
                         break;
                     case 'pve_hard':
-                        this.botBlack = new SmartBot('hard');
+                        this.botBlack = new Bot('hard');
                         break;
                     case 'eve':
-                        this.botWhite = new SmartBot('medium');
-                        this.botBlack = new SmartBot('hard');
+                        this.botWhite = new Bot('medium');
+                        this.botBlack = new Bot('hard');
                         break;
                 }
                 
