@@ -1,0 +1,828 @@
+# Написано нейросетью, потому-что я не знаю в js
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Микро-Шахматы 4x4</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        select {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        
+        .board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 2px;
+            width: 400px;
+            height: 400px;
+            margin: 0 auto;
+            border: 3px solid #8B4513;
+            background: #DEB887;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #F0D9B5;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .cell.dark {
+            background: #B58863;
+        }
+        
+        .cell.selected {
+            background: #AEC6CF !important;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .cell.possible-move {
+            background: #90EE90 !important;
+        }
+        
+        .cell.possible-capture {
+            background: #FFB6C1 !important;
+        }
+        
+        .coordinates {
+            position: absolute;
+            font-size: 10px;
+            color: rgba(0, 0, 0, 0.5);
+        }
+        
+        .coord-col {
+            bottom: 2px;
+            right: 2px;
+        }
+        
+        .coord-row {
+            top: 2px;
+            left: 2px;
+        }
+        
+        .pawn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .pawn.white {
+            background: white;
+            color: black;
+        }
+        
+        .pawn.black {
+            background: black;
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .status {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .rules {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        
+        .moves-history {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+        }
+        
+        .move-record {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Микро-Шахматы 4x4</h1>
+        
+        <div class="game-info">
+            <div id="currentPlayer">Ход: Белые</div>
+            <div id="gameMode">Режим: Игрок vs Игрок</div>
+        </div>
+        
+        <div class="controls">
+            <select id="gameModeSelect">
+                <option value="pvp">Игрок vs Игрок</option>
+                <option value="pve_easy">Игрок vs Бот (Легкий)</option>
+                <option value="pve_medium">Игрок vs Бот (Средний)</option>
+                <option value="pve_hard">Игрок vs Бот (Сложный)</option>
+                <option value="eve">Бот vs Бот</option>
+            </select>
+            <button id="newGameBtn">Новая игра</button>
+            <button id="undoBtn" disabled>Отменить ход</button>
+        </div>
+        
+        <div class="board" id="board"></div>
+        
+        <div class="status" id="status">Игра началась! Ход белых.</div>
+        
+        <div class="moves-history">
+            <h3>История ходов:</h3>
+            <div id="movesList"></div>
+        </div>
+        
+        <div class="rules">
+            <h3>📋 Правила игры:</h3>
+            <ul>
+                <li><strong>Ход пешки:</strong> на 1 клетку вперёд или по диагонали вперёд</li>
+                <li><strong>Взятие:</strong> по диагонали или сбоку (горизонтально)</li>
+                <li><strong>Цель:</strong> провести любую пешку на последнюю горизонталь</li>
+                <li><strong>Защита:</strong> пешка на последней линии защищена от немедленного взятия</li>
+                <li><strong>Пат:</strong> если игрок не может сделать ход - ничья</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        class MicroChess {
+            constructor() {
+                this.board = Array(4).fill().map(() => Array(4).fill(null));
+                this.currentPlayer = 'white';
+                this.selectedCell = null;
+                this.possibleMoves = [];
+                this.gameOver = false;
+                this.winner = null;
+                this.moveHistory = [];
+                this.setupBoard();
+            }
+            
+            setupBoard() {
+                // Белые пешки на линии 0 (a1-d1)
+                for (let col = 0; col < 4; col++) {
+                    this.board[0][col] = 'white';
+                }
+                // Черные пешки на линии 3 (a4-d4)
+                for (let col = 0; col < 4; col++) {
+                    this.board[3][col] = 'black';
+                }
+            }
+            
+            getCellCoord(row, col) {
+                const cols = ['a', 'b', 'c', 'd'];
+                return cols[col] + (4 - row);
+            }
+            
+            parseCoord(coord) {
+                const cols = {'a': 0, 'b': 1, 'c': 2, 'd': 3};
+                const colChar = coord[0];
+                const rowChar = coord[1];
+                return {
+                    row: 4 - parseInt(rowChar),
+                    col: cols[colChar]
+                };
+            }
+            
+            isValidMove(fromRow, fromCol, toRow, toCol) {
+                // Проверка базовых условий
+                if (toRow < 0 || toRow > 3 || toCol < 0 || toCol > 3) return false;
+                if (this.board[toRow][toCol] !== null) return false;
+                if (this.board[fromRow][fromCol] !== this.currentPlayer) return false;
+                
+                const rowDiff = toRow - fromRow;
+                const colDiff = toCol - fromCol;
+                
+                // Белые ходят "вниз" (увеличивают row), черные - "вверх" (уменьшают row)
+                if (this.currentPlayer === 'white') {
+                    return (rowDiff === 1 && colDiff === 0) ||  // вперед
+                           (rowDiff === 1 && Math.abs(colDiff) === 1); // по диагонали
+                } else {
+                    return (rowDiff === -1 && colDiff === 0) ||  // вперед
+                           (rowDiff === -1 && Math.abs(colDiff) === 1); // по диагонали
+                }
+            }
+            
+            isValidCapture(fromRow, fromCol, toRow, toCol) {
+                if (toRow < 0 || toRow > 3 || toCol < 0 || toCol > 3) return false;
+                
+                const target = this.board[toRow][toCol];
+                const opponent = this.currentPlayer === 'white' ? 'black' : 'white';
+                if (target !== opponent) return false;
+                
+                const rowDiff = toRow - fromRow;
+                const colDiff = toCol - fromCol;
+                
+                // Возможные направления взятия
+                const captureDirections = this.currentPlayer === 'white' 
+                    ? [[1, -1], [1, 1], [0, -1], [0, 1]]  // диагонали + боковые для белых
+                    : [[-1, -1], [-1, 1], [0, -1], [0, 1]]; // диагонали + боковые для черных
+                
+                return captureDirections.some(([dr, dc]) => dr === rowDiff && dc === colDiff);
+            }
+            
+            getPossibleMoves(row, col) {
+                const moves = [];
+                if (this.board[row][col] !== this.currentPlayer) return moves;
+                
+                // Проверяем все возможные клетки
+                for (let toRow = 0; toRow < 4; toRow++) {
+                    for (let toCol = 0; toCol < 4; toCol++) {
+                        if (this.isValidMove(row, col, toRow, toCol)) {
+                            moves.push({row: toRow, col: toCol, type: 'move'});
+                        } else if (this.isValidCapture(row, col, toRow, toCol)) {
+                            moves.push({row: toRow, col: toCol, type: 'capture'});
+                        }
+                    }
+                }
+                
+                return moves;
+            }
+            
+            makeMove(fromRow, fromCol, toRow, toCol) {
+                const fromCoord = this.getCellCoord(fromRow, fromCol);
+                const toCoord = this.getCellCoord(toRow, toCol);
+                const isCapture = this.board[toRow][toCol] !== null;
+                
+                // Сохраняем состояние для отмены хода
+                this.moveHistory.push({
+                    fromRow, fromCol, toRow, toCol,
+                    fromPiece: this.board[fromRow][fromCol],
+                    toPiece: this.board[toRow][toCol],
+                    player: this.currentPlayer
+                });
+                
+                // Выполняем ход
+                this.board[toRow][toCol] = this.board[fromRow][fromCol];
+                this.board[fromRow][fromCol] = null;
+                
+                // Проверяем условия победы
+                this.checkWinCondition();
+                
+                if (!this.gameOver) {
+                    this.currentPlayer = this.currentPlayer === 'white' ? 'black' : 'white';
+                }
+                
+                return {
+                    from: fromCoord,
+                    to: toCoord,
+                    capture: isCapture,
+                    player: this.currentPlayer === 'white' ? 'black' : 'white'
+                };
+            }
+            
+            undoMove() {
+                if (this.moveHistory.length === 0) return false;
+                
+                const lastMove = this.moveHistory.pop();
+                this.board[lastMove.fromRow][lastMove.fromCol] = lastMove.fromPiece;
+                this.board[lastMove.toRow][lastMove.toCol] = lastMove.toPiece;
+                this.currentPlayer = lastMove.player;
+                this.gameOver = false;
+                this.winner = null;
+                
+                return true;
+            }
+            
+            checkWinCondition() {
+                // Проверка достижения последней горизонтали
+                for (let col = 0; col < 4; col++) {
+                    // Белая пешка на последней линии (ряд 3)
+                    if (this.board[3][col] === 'white') {
+                        if (!this.canBeCaptured(3, col)) {
+                            this.gameOver = true;
+                            this.winner = 'white';
+                            return;
+                        }
+                    }
+                    // Черная пешка на последней линии (ряд 0)
+                    if (this.board[0][col] === 'black') {
+                        if (!this.canBeCaptured(0, col)) {
+                            this.gameOver = true;
+                            this.winner = 'black';
+                            return;
+                        }
+                    }
+                }
+                
+                // Проверка на пат
+                if (!this.hasLegalMoves()) {
+                    this.gameOver = true;
+                    this.winner = null; // Ничья
+                }
+            }
+            
+            canBeCaptured(row, col) {
+                const piece = this.board[row][col];
+                const opponent = piece === 'white' ? 'black' : 'white';
+                
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 0; c < 4; c++) {
+                        if (this.board[r][c] === opponent) {
+                            const captureDirections = opponent === 'black' 
+                                ? [[-1, -1], [-1, 1], [0, -1], [0, 1]]
+                                : [[1, -1], [1, 1], [0, -1], [0, 1]];
+                            
+                            for (const [dr, dc] of captureDirections) {
+                                const newRow = r + dr;
+                                const newCol = c + dc;
+                                if (newRow === row && newCol === col) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+            
+            hasLegalMoves() {
+                for (let row = 0; row < 4; row++) {
+                    for (let col = 0; col < 4; col++) {
+                        if (this.board[row][col] === this.currentPlayer) {
+                            if (this.getPossibleMoves(row, col).length > 0) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+            
+            getAllLegalMoves() {
+                const moves = [];
+                for (let fromRow = 0; fromRow < 4; fromRow++) {
+                    for (let fromCol = 0; fromCol < 4; fromCol++) {
+                        if (this.board[fromRow][fromCol] === this.currentPlayer) {
+                            const possibleMoves = this.getPossibleMoves(fromRow, fromCol);
+                            for (const move of possibleMoves) {
+                                moves.push({
+                                    fromRow, fromCol,
+                                    toRow: move.row, toCol: move.col,
+                                    type: move.type
+                                });
+                            }
+                        }
+                    }
+                }
+                return moves;
+            }
+        }
+
+        class Bot {
+            constructor(difficulty = 'easy') {
+                this.difficulty = difficulty;
+            }
+            
+            getMove(game) {
+                const moves = game.getAllLegalMoves();
+                if (moves.length === 0) return null;
+                
+                switch (this.difficulty) {
+                    case 'easy':
+                        return this.getEasyMove(moves);
+                    case 'medium':
+                        return this.getMediumMove(moves, game);
+                    case 'hard':
+                        return this.getHardMove(moves, game);
+                    default:
+                        return this.getEasyMove(moves);
+                }
+            }
+            
+            getEasyMove(moves) {
+                // Случайный ход
+                return moves[Math.floor(Math.random() * moves.length)];
+            }
+            
+            getMediumMove(moves, game) {
+                // Предпочитает взятия и движение к победе
+                const scoredMoves = moves.map(move => {
+                    let score = 0;
+                    
+                    // Взятие получает высокий приоритет
+                    if (move.type === 'capture') {
+                        score += 10;
+                    }
+                    
+                    // Движение к победе
+                    if (game.currentPlayer === 'white' && move.toRow === 3) {
+                        score += 20;
+                    } else if (game.currentPlayer === 'black' && move.toRow === 0) {
+                        score += 20;
+                    }
+                    
+                    // Предпочтение центральным колонкам
+                    if (move.toCol === 1 || move.toCol === 2) {
+                        score += 1;
+                    }
+                    
+                    return { score, move };
+                });
+                
+                scoredMoves.sort((a, b) => b.score - a.score);
+                const bestScore = scoredMoves[0].score;
+                const bestMoves = scoredMoves.filter(item => item.score === bestScore);
+                return bestMoves[Math.floor(Math.random() * bestMoves.length)].move;
+            }
+            
+            getHardMove(moves, game) {
+                // Минимакс с небольшой глубиной
+                let bestScore = -Infinity;
+                let bestMoves = [];
+                
+                for (const move of moves) {
+                    // Создаем копию игры для симуляции
+                    const testGame = {
+                        board: game.board.map(row => [...row]),
+                        currentPlayer: game.currentPlayer
+                    };
+                    
+                    // Делаем ход
+                    testGame.board[move.toRow][move.toCol] = testGame.board[move.fromRow][move.fromCol];
+                    testGame.board[move.fromRow][move.fromCol] = null;
+                    testGame.currentPlayer = testGame.currentPlayer === 'white' ? 'black' : 'white';
+                    
+                    // Оцениваем позицию
+                    const score = this.evaluatePosition(testGame);
+                    
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMoves = [move];
+                    } else if (score === bestScore) {
+                        bestMoves.push(move);
+                    }
+                }
+                
+                return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+            }
+            
+            evaluatePosition(game) {
+                let score = 0;
+                
+                for (let row = 0; row < 4; row++) {
+                    for (let col = 0; col < 4; col++) {
+                        const piece = game.board[row][col];
+                        if (piece === game.currentPlayer) {
+                            score += 1;
+                            // Близость к победе
+                            if (game.currentPlayer === 'white') {
+                                score += (3 - row) * 2;
+                            } else {
+                                score += row * 2;
+                            }
+                        } else if (piece !== null) {
+                            score -= 1;
+                        }
+                    }
+                }
+                
+                return score;
+            }
+        }
+
+        class GameUI {
+            constructor() {
+                this.game = new MicroChess();
+                this.botWhite = null;
+                this.botBlack = null;
+                this.gameMode = 'pvp';
+                this.isBotThinking = false;
+                this.initializeBoard();
+                this.setupEventListeners();
+                this.updateUI();
+            }
+            
+            initializeBoard() {
+                const board = document.getElementById('board');
+                board.innerHTML = '';
+                
+                for (let row = 0; row < 4; row++) {
+                    for (let col = 0; col < 4; col++) {
+                        const cell = document.createElement('div');
+                        cell.className = `cell ${(row + col) % 2 === 0 ? '' : 'dark'}`;
+                        cell.dataset.row = row;
+                        cell.dataset.col = col;
+                        
+                        // Добавляем координаты
+                        const colCoord = document.createElement('div');
+                        colCoord.className = 'coordinates coord-col';
+                        colCoord.textContent = 'abcd'[col];
+                        
+                        const rowCoord = document.createElement('div');
+                        rowCoord.className = 'coordinates coord-row';
+                        rowCoord.textContent = 4 - row;
+                        
+                        cell.appendChild(colCoord);
+                        cell.appendChild(rowCoord);
+                        
+                        cell.addEventListener('click', () => this.handleCellClick(row, col));
+                        board.appendChild(cell);
+                    }
+                }
+            }
+            
+            setupEventListeners() {
+                document.getElementById('newGameBtn').addEventListener('click', () => this.newGame());
+                document.getElementById('undoBtn').addEventListener('click', () => this.undoMove());
+                document.getElementById('gameModeSelect').addEventListener('change', (e) => {
+                    this.gameMode = e.target.value;
+                    this.newGame();
+                });
+            }
+            
+            handleCellClick(row, col) {
+                if (this.game.gameOver || this.isBotThinking) return;
+                
+                // Проверяем, является ли текущий игрок ботом
+                const currentBot = this.game.currentPlayer === 'white' ? this.botWhite : this.botBlack;
+                if (currentBot) return;
+                
+                // Если клетка уже выбрана, делаем ход
+                if (this.game.selectedCell) {
+                    const [selectedRow, selectedCol] = this.game.selectedCell;
+                    const move = this.game.possibleMoves.find(m => m.row === row && m.col === col);
+                    
+                    if (move) {
+                        this.makeMove(selectedRow, selectedCol, row, col);
+                    }
+                    this.clearSelection();
+                } else {
+                    // Выбираем клетку
+                    if (this.game.board[row][col] === this.game.currentPlayer) {
+                        this.game.selectedCell = [row, col];
+                        this.game.possibleMoves = this.game.getPossibleMoves(row, col);
+                        this.updateUI();
+                    }
+                }
+            }
+            
+            makeMove(fromRow, fromCol, toRow, toCol) {
+                const moveResult = this.game.makeMove(fromRow, fromCol, toRow, toCol);
+                this.addMoveToHistory(moveResult);
+                this.updateUI();
+                
+                // Проверяем, не закончилась ли игра
+                if (!this.game.gameOver) {
+                    // Проверяем, должен ли следующий ход сделать бот
+                    this.checkBotMove();
+                }
+            }
+            
+            addMoveToHistory(move) {
+                const movesList = document.getElementById('movesList');
+                const moveElement = document.createElement('div');
+                moveElement.className = 'move-record';
+                
+                const player = move.player === 'white' ? 'Белые' : 'Черные';
+                const captureText = move.capture ? ' × ' : ' → ';
+                
+                moveElement.innerHTML = `
+                    <span>${player}</span>
+                    <span>${move.from}${captureText}${move.to}</span>
+                `;
+                
+                movesList.appendChild(moveElement);
+                movesList.scrollTop = movesList.scrollHeight;
+            }
+            
+            checkBotMove() {
+                const currentBot = this.game.currentPlayer === 'white' ? this.botWhite : this.botBlack;
+                
+                if (currentBot && !this.game.gameOver) {
+                    this.isBotThinking = true;
+                    this.updateUI();
+                    
+                    // Добавляем небольшую задержку для "раздумий" бота
+                    setTimeout(() => {
+                        const move = currentBot.getMove(this.game);
+                        if (move) {
+                            this.makeMove(move.fromRow, move.fromCol, move.toRow, move.toCol);
+                        }
+                        this.isBotThinking = false;
+                    }, 500);
+                }
+            }
+            
+            clearSelection() {
+                this.game.selectedCell = null;
+                this.game.possibleMoves = [];
+                this.updateUI();
+            }
+            
+            updateUI() {
+                // Обновляем доску
+                const cells = document.querySelectorAll('.cell');
+                cells.forEach(cell => {
+                    const row = parseInt(cell.dataset.row);
+                    const col = parseInt(cell.dataset.col);
+                    const piece = this.game.board[row][col];
+                    
+                    // Очищаем клетку
+                    cell.innerHTML = '';
+                    
+                    // Восстанавливаем координаты
+                    const colCoord = document.createElement('div');
+                    colCoord.className = 'coordinates coord-col';
+                    colCoord.textContent = 'abcd'[col];
+                    
+                    const rowCoord = document.createElement('div');
+                    rowCoord.className = 'coordinates coord-row';
+                    rowCoord.textContent = 4 - row;
+                    
+                    cell.appendChild(colCoord);
+                    cell.appendChild(rowCoord);
+                    
+                    // Добавляем пешку, если есть
+                    if (piece) {
+                        const pawn = document.createElement('div');
+                        pawn.className = `pawn ${piece}`;
+                        pawn.textContent = '♟';
+                        cell.appendChild(pawn);
+                    }
+                    
+                    // Подсвечиваем выбранную клетку и возможные ходы
+                    cell.classList.remove('selected', 'possible-move', 'possible-capture');
+                    
+                    if (this.game.selectedCell && this.game.selectedCell[0] === row && this.game.selectedCell[1] === col) {
+                        cell.classList.add('selected');
+                    }
+                    
+                    const possibleMove = this.game.possibleMoves.find(m => m.row === row && m.col === col);
+                    if (possibleMove) {
+                        cell.classList.add(possibleMove.type === 'capture' ? 'possible-capture' : 'possible-move');
+                    }
+                });
+                
+                // Обновляем информацию о игроке
+                document.getElementById('currentPlayer').textContent = 
+                    `Ход: ${this.game.currentPlayer === 'white' ? 'Белые' : 'Черные'}`;
+                
+                // Обновляем статус игры
+                const status = document.getElementById('status');
+                if (this.game.gameOver) {
+                    if (this.game.winner) {
+                        status.textContent = `🎉 Победа ${this.game.winner === 'white' ? 'белых' : 'черных'}!`;
+                        status.style.background = '#4CAF50';
+                    } else {
+                        status.textContent = '🤝 Ничья!';
+                        status.style.background = '#FF9800';
+                    }
+                } else if (this.isBotThinking) {
+                    status.textContent = '🤖 Бот думает...';
+                    status.style.background = '#2196F3';
+                } else {
+                    status.textContent = `Игра идет. Ход: ${this.game.currentPlayer === 'white' ? 'белых' : 'черных'}`;
+                    status.style.background = 'rgba(0, 0, 0, 0.2)';
+                }
+                
+                // Обновляем информацию о режиме игры
+                const modeText = {
+                    'pvp': 'Игрок vs Игрок',
+                    'pve_easy': 'Игрок vs Бот (Легкий)',
+                    'pve_medium': 'Игрок vs Бот (Средний)',
+                    'pve_hard': 'Игрок vs Бот (Сложный)',
+                    'eve': 'Бот vs Бот'
+                };
+                document.getElementById('gameMode').textContent = `Режим: ${modeText[this.gameMode]}`;
+                
+                // Обновляем кнопку отмены хода
+                document.getElementById('undoBtn').disabled = this.game.moveHistory.length === 0;
+            }
+            
+            newGame() {
+                this.game = new MicroChess();
+                
+                // Настраиваем ботов в зависимости от режима игры
+                this.botWhite = null;
+                this.botBlack = null;
+                
+                switch (this.gameMode) {
+                    case 'pve_easy':
+                        this.botBlack = new Bot('easy');
+                        break;
+                    case 'pve_medium':
+                        this.botBlack = new Bot('medium');
+                        break;
+                    case 'pve_hard':
+                        this.botBlack = new Bot('hard');
+                        break;
+                    case 'eve':
+                        this.botWhite = new Bot('medium');
+                        this.botBlack = new Bot('hard');
+                        break;
+                }
+                
+                // Очищаем историю ходов
+                document.getElementById('movesList').innerHTML = '';
+                
+                this.clearSelection();
+                this.updateUI();
+                
+                // Если первый ход за ботом
+                this.checkBotMove();
+            }
+            
+            undoMove() {
+                if (this.game.undoMove()) {
+                    // Удаляем последний ход из истории
+                    const movesList = document.getElementById('movesList');
+                    if (movesList.lastChild) {
+                        movesList.removeChild(movesList.lastChild);
+                    }
+                    this.updateUI();
+                }
+            }
+        }
+
+        // Инициализация игры при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            new GameUI();
+        });
+    </script>
+</body>
+</html>
